@@ -29,6 +29,7 @@ ROUTES = {
     "htan_rag",
     "vision_only",
     "vision_rag",
+    "booking",
 }
 
 VISION_IMAGE_TYPES = {
@@ -60,11 +61,18 @@ Decide:
 - whether evidence retrieval is useful,
 - whether HTAN segmentation is appropriate,
 - whether vision extraction/description is needed for a document, radiology,
-  or other general medical image.
+  or other general medical image,
+- whether the user wants to find/book a doctor appointment (booking intent).
 
 HTAN is allowed only for the configured HTAN-supported modalities.
 Medical documents, X-ray/CT/MRI/ultrasound/radiology, and other medical images
 must use vision routes, not HTAN.
+
+Use the "booking" route when the user wants to:
+- Find or recommend a doctor
+- Book a medical appointment
+- Search for specialists by area, fee, or specialty
+- Ask about available doctors or clinics
 
 Allowed routes:
 - direct
@@ -74,6 +82,7 @@ Allowed routes:
 - htan_rag
 - vision_only
 - vision_rag
+- booking
 
 Use triage_question when the user describes symptoms but key clinical details
 are missing and a focused assessment would be premature. Ask concise follow-up
@@ -89,6 +98,8 @@ JSON schema:
   "needs_rag": true,
   "needs_htan": false,
   "needs_vision": false,
+  "needs_booking": false,
+  "booking_query": null,
   "image_type": null,
   "modality": null,
   "rag_query": null,
@@ -299,6 +310,7 @@ def _normalize_decision(
     needs_htan = _as_bool(decision.get("needs_htan"), False)
     needs_vision = _as_bool(decision.get("needs_vision"), False)
     needs_rag = _as_bool(decision.get("needs_rag"), False)
+    needs_booking = _as_bool(decision.get("needs_booking"), False)
 
     # Enforce service boundaries while leaving the medical choice to Haiku.
     if (
@@ -317,6 +329,8 @@ def _normalize_decision(
         needs_htan = True
     if route in {"rag_only", "htan_rag", "vision_rag"}:
         needs_rag = True
+    if route == "booking":
+        needs_booking = True
 
     normalized = {
         "intent": str(decision.get("intent") or "general").strip().lower(),
@@ -326,6 +340,7 @@ def _normalize_decision(
         "needs_htan": needs_htan,
         "needs_vision": needs_vision,
         "needs_triage": route == "triage_question",
+        "needs_booking": needs_booking,
         "router_triage_questions": questions,
         "image_type": image_type,
         "modality": modality,
@@ -335,6 +350,13 @@ def _normalize_decision(
     rag_query = decision.get("rag_query")
     if isinstance(rag_query, str) and rag_query.strip():
         normalized["rag_query"] = rag_query.strip()
+
+    # Booking query from the router for the autorec node.
+    booking_query = decision.get("booking_query")
+    if isinstance(booking_query, str) and booking_query.strip():
+        normalized["booking_query"] = booking_query.strip()
+    elif route == "booking":
+        normalized["booking_query"] = question
 
     if route == "direct":
         normalized["final_answer"] = _direct_answer_for(decision)

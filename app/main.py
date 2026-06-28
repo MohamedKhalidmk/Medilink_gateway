@@ -41,7 +41,11 @@ async def lifespan(app: FastAPI):
     llm.init_clients()
     for warning in config.validate():
         logger.warning("CONFIG: %s", warning)
-    logger.info("Gateway ready. HTAN=%s RAG=%s", config.HTAN_SERVICE_URL, config.RAG_SERVICE_URL)
+    logger.info(
+        "Gateway ready. HTAN=%s RAG=%s AutoRec=%s Agent=%s",
+        config.HTAN_SERVICE_URL, config.RAG_SERVICE_URL,
+        config.AUTOREC_SERVICE_URL, config.AGENT_SERVICE_URL,
+    )
     yield
 
 
@@ -143,6 +147,8 @@ def _response_from_state(final_state: dict[str, Any]) -> AgentResponse:
         triage_questions=final_state.get("triage_questions"),
         rag_query_used=final_state.get("rag_query_used"),
         doctor_report=final_state.get("doctor_report"),
+        autorec_result=final_state.get("autorec_result"),
+        agent_result=final_state.get("agent_result"),
         error=final_state.get("error"),
     )
 
@@ -154,6 +160,8 @@ def health() -> HealthResponse:
         status="ok",
         htan_service=clients.htan_healthy(),
         rag_service=clients.rag_healthy(),
+        autorec_service=clients.autorec_healthy(),
+        agent_service=clients.agent_healthy(),
         llm_configured=bool(config.ANTHROPIC_API_KEY),
         warnings=config.validate(),
     )

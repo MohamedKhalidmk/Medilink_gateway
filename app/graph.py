@@ -13,6 +13,7 @@ Implemented routes:
   htan_rag        : router -> htan -> rag -> medical_llm -> report -> END
   vision_only     : router -> vision -> medical_llm -> report -> END
   vision_rag      : router -> vision -> rag -> medical_llm -> report -> END
+  booking         : router -> autorec -> agent -> END
 
 Full structure:
 
@@ -43,6 +44,8 @@ Full structure:
        +-- vision_only ------> vision --------> medical_llm --> report --> END
        |
        +-- vision_rag -------> vision --------> rag ---------> medical_llm --> report --> END
+       |
+       +-- booking ----------> autorec -------> agent -------> END
 
 Route ownership:
   - intent_router decides the route with Haiku.
@@ -52,6 +55,8 @@ Route ownership:
   - rag retrieves evidence.
   - medical_llm produces the final clinical answer.
   - report formats the final answer and doctor_report.
+  - autorec retrieves doctor recommendations from the AutoRec service.
+  - agent automates booking on Vezeeta using recommendations from autorec.
 """
 
 from __future__ import annotations
@@ -59,6 +64,8 @@ from __future__ import annotations
 from langgraph.graph import END, StateGraph
 
 from app.nodes import (
+    agent_node,
+    autorec_node,
     htan_node,
     intent_router_node,
     medical_llm_node,
@@ -91,6 +98,8 @@ def route_after_intent(state: MediLinkState) -> str:
         return "vision"
     if route == "vision_rag":
         return "vision"
+    if route == "booking":
+        return "autorec"
     return "end"
 
 
@@ -136,15 +145,24 @@ def build_graph():
     graph.add_node("rag", rag_node)
     graph.add_node("medical_llm", medical_llm_node)
     graph.add_node("report", report_generator_node)
+    graph.add_node("autorec", autorec_node)
+    graph.add_node("agent", agent_node)
 
     # Every request starts with Haiku routing.
     graph.set_entry_point("intent_router")
 
-    # Router branch: direct/triage/HTAN/RAG/vision.
+    # Router branch: direct/triage/HTAN/RAG/vision/booking.
     graph.add_conditional_edges(
         "intent_router",
         route_after_intent,
-        {"triage": "triage", "htan": "htan", "vision": "vision", "rag": "rag", "end": END},
+        {
+            "triage": "triage",
+            "htan": "htan",
+            "vision": "vision",
+            "rag": "rag",
+            "autorec": "autorec",
+            "end": END,
+        },
     )
 
     # Triage stops after Sonnet asks the exact follow-up questions.
@@ -175,8 +193,13 @@ def build_graph():
     graph.add_edge("medical_llm", "report")
     graph.add_edge("report", END)
 
+    # Booking path: autorec -> agent -> END.
+    graph.add_edge("autorec", "agent")
+    graph.add_edge("agent", END)
+
     return graph.compile()
 
 
 # Compiled once at import; reused across requests by app/main.py.
 medilink_graph = build_graph()
+

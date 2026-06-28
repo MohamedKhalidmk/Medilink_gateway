@@ -40,6 +40,8 @@ class AgentResponse(BaseModel):
     triage_questions: list[str] | None = None
     rag_query_used: str | None = None
     doctor_report: dict[str, Any] | None = None
+    autorec_result: dict[str, Any] | None = None
+    agent_result: dict[str, Any] | None = None
     error: str | None = None
 
 
@@ -49,5 +51,7 @@ class HealthResponse(BaseModel):
     status: str
     htan_service: bool
     rag_service: bool
+    autorec_service: bool
+    agent_service: bool
     llm_configured: bool
     warnings: list[str] = Field(default_factory=list)

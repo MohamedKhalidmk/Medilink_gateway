@@ -3,7 +3,7 @@ HTTP clients for downstream MediLink services.
 
 This module is intentionally small and non-medical:
   1. graph nodes decide what work is needed.
-  2. this module formats HTTP requests for HTAN and RAG.
+  2. this module formats HTTP requests for HTAN, RAG, AutoRec, and Agent.
   3. downstream services return JSON.
   4. graph nodes normalize that JSON into state fields.
 
@@ -121,5 +121,69 @@ def rag_healthy() -> bool:
     try:
         with httpx.Client(timeout=config.SERVICE_HEALTH_TIMEOUT) as http:
             return http.get(f"{config.RAG_SERVICE_URL}/health").status_code == 200
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def call_autorec(
+    user_query: str,
+    *,
+    user_id: str | None = None,
+    specialty_slug: str | None = None,
+    area: str | None = None,
+    max_fee_egp: int | None = None,
+    max_wait_minutes: int | None = None,
+    top_k: int = 5,
+) -> dict:
+    """
+    Send a recommendation query to the AutoRec service.
+
+    autorec_node.py builds the query from the user message and booking context.
+    This function preserves that query and filters in the payload shape expected
+    by medilink-autorec.
+    """
+    url = f"{config.AUTOREC_SERVICE_URL}/recommend"
+    payload: dict = {
+        "user_query": user_query,
+        "top_k": top_k,
+    }
+    if user_id is not None:
+        payload["user_id"] = user_id
+    if specialty_slug is not None:
+        payload["specialty_slug"] = specialty_slug
+    if area is not None:
+        payload["area"] = area
+    if max_fee_egp is not None:
+        payload["max_fee_egp"] = max_fee_egp
+    if max_wait_minutes is not None:
+        payload["max_wait_minutes"] = max_wait_minutes
+    return _post(url, timeout=config.AUTOREC_TIMEOUT, json=payload)
+
+
+def call_agent(booking_payload: dict) -> dict:
+    """
+    Send a booking request to the Agent service.
+
+    agent_node.py builds the booking payload from autorec results and user
+    context. This function forwards that payload to the agent.
+    """
+    url = f"{config.AGENT_SERVICE_URL}/book"
+    return _post(url, timeout=config.AGENT_TIMEOUT, json=booking_payload)
+
+
+def autorec_healthy() -> bool:
+    """Return True only when the AutoRec service answers its health endpoint."""
+    try:
+        with httpx.Client(timeout=config.SERVICE_HEALTH_TIMEOUT) as http:
+            return http.get(f"{config.AUTOREC_SERVICE_URL}/health").status_code == 200
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def agent_healthy() -> bool:
+    """Return True only when the Agent service answers its health endpoint."""
+    try:
+        with httpx.Client(timeout=config.SERVICE_HEALTH_TIMEOUT) as http:
+            return http.get(f"{config.AGENT_SERVICE_URL}/health").status_code == 200
     except Exception:  # noqa: BLE001
         return False

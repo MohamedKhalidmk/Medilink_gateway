@@ -6,6 +6,8 @@ from app.nodes.report_generator import report_generator_node
 from app.nodes.quality_gate import gate_htan, gate_rag
 from app.nodes.triage_node import triage_node
 from app.nodes.vision_node import vision_node
+from app.nodes.autorec_node import autorec_node
+from app.nodes.agent_node import agent_node
 
 __all__ = [
     "intent_router_node",
@@ -17,4 +19,6 @@ __all__ = [
     "gate_rag",
     "triage_node",
     "vision_node",
+    "autorec_node",
+    "agent_node",
 ]

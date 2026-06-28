@@ -43,6 +43,7 @@ class MediLinkState(TypedDict, total=False):
     needs_htan: Optional[bool]
     needs_vision: Optional[bool]
     needs_triage: Optional[bool]
+    needs_booking: Optional[bool]
 
     # Haiku router can suggest missing questions, but this is not the final
     # patient-facing triage list. triage_node.py uses these as hints.
@@ -87,3 +88,8 @@ class MediLinkState(TypedDict, total=False):
 
     # Error field set by any node that catches a recoverable failure.
     error: Optional[str]
+
+    # Booking flow fields written by app/nodes/autorec_node.py and agent_node.py.
+    booking_query: Optional[str]         # Natural language booking request from the user.
+    autorec_result: Optional[dict]       # Doctor recommendations from AutoRec service.
+    agent_result: Optional[dict]         # Booking result from Agent service.
